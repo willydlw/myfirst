@@ -159,10 +159,26 @@ bool Controller::StartUp()
 
 void Controller::MoveToEntrance(void)
 {
-  if (this->arrived)
-    return;
 
-  ROS_DEBUG("entering function MoveToEntrance");
+  static int arrivalCount = 0;
+  if (this->arrived){
+    if(arrivalCount == 0)
+    {
+      bool call = this->originClient.call(this->originSrv);
+      if (!call || !this->originSrv.response.success)
+      {
+        ROS_ERROR("Failed to call pose_from_artifact_origin service, \
+        robot may not exist, be outside staging area, or the service is \
+        not available.");
+      }
+      auto pose = this->originSrv.response.pose.pose;
+      ROS_INFO("Arrival position, x: %.2f, y: %.2f, z: %.2f", pose.position.x, pose.position.y, pose.position.z);
+      arrivalCount += 1;
+    }
+    
+    return;
+  }
+    
 
   bool call = this->originClient.call(this->originSrv);
   // Query current robot position w.r.t. entrance
@@ -180,8 +196,6 @@ not available.");
 
   auto pose = this->originSrv.response.pose.pose;
 
-  ROS_INFO("position: x %.2f, y %.2f, z %.2f", pose.position.x, pose.position.y, pose.position.z);
-
   // Simple example for robot to go to entrance
   geometry_msgs::Twist msg;
 
@@ -190,7 +204,7 @@ not available.");
     pose.position.y * pose.position.y;
 
   ROS_INFO("Distance to goal: %.2f", dist);
-
+  
   // Arrived
   if (dist < 0.3 || pose.position.x >= -0.3)
   {
@@ -198,6 +212,7 @@ not available.");
     msg.angular.z = 0;
     this->arrived = true;
     ROS_INFO("Arrived at entrance!");
+    ROS_INFO("position: x %.2f, y %.2f, z %.2f", pose.position.x, pose.position.y, pose.position.z);
   }
   // Move towards entrance
   else
@@ -210,7 +225,8 @@ not available.");
     double cosy_cosp = +1.0 - 2.0 * (q.y * q.y + q.z * q.z);
     auto yaw = atan2(siny_cosp, cosy_cosp);
 
-    ROS_INFO("yaw: %.2f, pose.position.y: %.2f", yaw, pose.position.y);
+    ROS_INFO("yaw: %.2f", yaw);
+    ROS_INFO("position: x %.2f, y %.2f, z %.2f", pose.position.x, pose.position.y, pose.position.z);
 
     auto facingFront = abs(yaw) < 0.1;
     auto facingEast = abs(yaw + M_PI * 0.5) < 0.1;
